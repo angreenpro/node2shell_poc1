@@ -1,0 +1,88 @@
+CVE-2026-111497-main/
+├── Makefile                                  # Điều phối trung tâm: make up, make test, make matrix, make compare, make evidence
+├── README.md                                 # Tài liệu hướng dẫn kiến trúc và vận hành toàn cục
+├── docker-compose.yml                        # Master Compose: Bật cùng lúc WAF + 5 Node Versions + Falco eBPF + Dozzle UI
+├── start-lab.sh                              # Khởi chạy Lab (Tự động xử lý nhãn SELinux trên Fedora Linux)
+├── cleanup-lab.sh                            # Dọn dẹp toàn bộ container và mạng ảo
+│
+├── lab/                                      # [PHÂN HỆ 1] 5 PHIÊN BẢN NODE.JS TÁCH RIÊNG ĐỘC LẬP
+│   ├── docker-compose.yml                    # Compose riêng của cụm 5 phiên bản Node.js + Mock External Server
+│   ├── compare_versions_matrix.py            # Script Python đối chứng đồng loạt cả 5 phiên bản (0 dependencies)
+│   │
+│   ├── node-20.19.5-vuln/                    # 1. Nhánh 20.x EOL - Chưa vá (libbrotli 1.0.9) ──► Port 3020
+│   │   ├── Dockerfile                        #    FROM node:20.19.5-bookworm-slim
+│   │   ├── docker-compose.yml                #    Chạy lẻ riêng bản 20.19.5 nếu cần
+│   │   ├── .env                              #    SIM_NODE_VER=v20.19.5 | SIM_BROTLI_VER=1.0.9
+│   │   ├── package.json
+│   │   └── server.js
+│   │
+│   ├── node-22.23.3-vuln/                    # 2. Nhánh 22.x LTS - Chưa vá (libbrotli 1.1.0) ──► Port 3000 & 3022
+│   │   ├── Dockerfile                        #    (Đóng vai trò Target mặc định đứng sau Nginx WAF)
+│   │   ├── docker-compose.yml
+│   │   ├── .env                              #    SIM_NODE_VER=v22.23.3 | SIM_BROTLI_VER=1.1.0
+│   │   ├── package.json
+│   │   └── server.js
+│   │
+│   ├── node-24.22.0-vuln/                    # 3. Nhánh 24.x Current - Chưa vá (libbrotli 1.1.0) ──► Port 3024
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml
+│   │   ├── .env                              #    SIM_NODE_VER=v24.22.0 | SIM_BROTLI_VER=1.1.0
+│   │   ├── package.json
+│   │   └── server.js
+│   │
+│   ├── node-22.23.4-patched/                 # 4. Nhánh 22.x LTS - ĐÃ VÁ (libbrotli 1.1.1) ──► Port 3002 & 3025
+│   │   ├── Dockerfile                        #    (Đóng vai trò Patched Control đối chứng trực tiếp với bản 22.23.3)
+│   │   ├── docker-compose.yml
+│   │   ├── .env                              #    SIM_NODE_VER=v22.23.4 | SIM_BROTLI_VER=1.1.1
+│   │   ├── package.json
+│   │   └── server.js
+│   │
+│   ├── node-24.22.2-patched/                 # 5. Nhánh 24.x Current - ĐÃ VÁ (libbrotli 1.2.1) ──► Port 3026
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml
+│   │   ├── .env                              #    SIM_NODE_VER=v24.22.2 | SIM_BROTLI_VER=1.2.1
+│   │   ├── package.json
+│   │   └── server.js
+│   │
+│   └── mock-external/                        # 6. Máy chủ giả lập bên ngoài kiểm tra Outbound fetch() ──► Port 4000
+│       ├── Dockerfile
+│       └── mock-external.js
+│
+├── attacker/                                 # [PHÂN HỆ 2] BỘ KIỂM THỬ TẤN CÔNG (CHẠY TỪ KALI VM HOẶC HOST)
+│   └── scripts/
+│       ├── common.py                         # Thư viện HTTP dùng chung (urllib chuẩn, 0 package cài thêm)
+│       ├── test_01_recon_version.py          # Test 01: Rà soát phiên bản Binary & C++ libbrotli
+│       ├── test_02_differential_probe.py     # Test 02: Kiểm thử vi sai (0x3b hợp lệ vs 0xff lỗi)
+│       ├── test_03_inbound_waf_and_dos.py    # Test 03: Kiểm thử WAF chặn HTTP 415 & chống sập Stream Error
+│       ├── test_04_outbound_ssrf_client.py   # Test 04: Kiểm thử phơi nhiễm Outbound fetch() Accept-Encoding: br
+│       ├── test_05_edr_rce_telemetry.py      # Test 05: Kích hoạt RCE giả lập & kiểm tra cảnh báo Falco eBPF
+│       ├── compare_versions_matrix.py        # Chạy đối chứng ma trận cả 5 phiên bản từ Kali VM
+│       ├── run_all_tests.py                  # Master Runner tổng hợp Scorecard & xuất JSON
+│       ├── run_tests.sh                      # Script khởi chạy tự động nhận diện WSL2 / Fedora / Kali
+│       └── run_lab_tests.sh / .ps1 / .bat    # Menu tương tác CLI đa nền tảng
+│
+├── detection/                                # [PHÂN HỆ 3] PHÁT HIỆN & GIÁM SÁT ĐA TẦNG (SOC / BLUE TEAM)
+│   ├── falco_rules.yaml                      # Luật eBPF bắt syscall execve khi tiến trình `node` gọi `/bin/sh`
+│   ├── suricata.rules                        # Luật IDS bắt luồng Brotli Probe (8b 00 00 46 a4) & gói dò quét 0xff
+│   ├── auditd.rules                          # Luật Linux Auditd giám sát thực thi shell trên máy chủ
+│   ├── nginx_waf.conf                        # Cấu hình Nginx WAF chặn Content-Encoding: br & ghi log an ninh
+│   ├── verify_detections.py                  # Script tự động kiểm chứng 3 tầng phát hiện
+│   └── PLAYBOOK.md                           # Quy trình phản ứng sự cố 4 bước cho SOC
+│
+├── remediation/                              # [PHÂN HỆ 4] KHẮC PHỤC, GIA CỐ & NGHIỆM THU (PATCHING & HARDENING)
+│   ├── REMEDIATION_SUMMARY.md                # Chiến lược khắc phục 4 lớp (Runtime, WAF, Outbound Code, Container)
+│   ├── docker-compose-patched.yml            # Cụm Docker Hardened (Non-root USER node, Read-only FS, Cap Drop ALL)
+│   ├── configs/
+│   │   ├── patched_target.Dockerfile         # Dockerfile nâng cấp Node.js >= 22.23.4 & hạ quyền USER node
+│   │   ├── nginx.conf.hardened               # Cấu hình Nginx WAF đã gia cố
+│   │   ├── aws_waf_rule.json                 # Mẫu Rule AWS WAF theo chuẩn AWS Security Bulletin 2026-155
+│   │   └── server.js.hardened                # Code Backend đã lọc bỏ `br` chiều ra và giới hạn 1MB giải nén
+│   ├── patches/
+│   │   └── apply_remediation.sh              # Script tự động triển khai bản vá và chạy nghiệm thu
+│   └── tests/
+│       ├── verify_remediation.py             # Kiểm thử nghiệm thu 5 tiêu chí sau khi vá
+│       └── compare_labs.py                   # Đối chứng trực tiếp A/B (Trước khi vá :3000 vs Sau khi vá :3002)
+│
+├── scripts/
+│   └── collect_evidence.sh                   # Tự động chạy toàn bộ bài test và gom Log + JSON vào ./evidence/
+└── evidence/                                 # Thư mục lưu trữ báo cáo JSON và log bằng chứng

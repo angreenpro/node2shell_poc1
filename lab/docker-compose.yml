@@ -1,0 +1,55 @@
+services:
+  node-20-19-5:
+    build: ./node-20.19.5
+    container_name: lab-node20
+    env_file: ./node-20.19.5/.env
+    ports:
+      - "0.0.0.0:3020:3000"
+    networks:
+      - lab-versions-net
+
+  node-22-23-3:
+    build: ./node-22.23.3
+    container_name: lab-node-22.23.3
+    env_file: ./node-22.23.3/.env
+    ports:
+      - "0.0.0.0:3022:3000"
+    networks:
+      - lab-versions-net
+
+  node-24-22-0:
+    build: ./node-24.22.0
+    container_name: lab-node-24.22.0
+    env_file: ./node-24.22.0/.env
+    ports:
+      - "0.0.0.0:3024:3000"
+    networks:
+      - lab-versions-net
+
+  node-22-23-4:
+    build: ./node-22.23.4
+    container_name: lab-node22
+    env_file: ./node-22.23.4/.env
+    ports:
+      - "0.0.0.0:3025:3000"
+    networks:
+      - lab-versions-net
+
+  node-24-22-2:
+    build: ./node-24.22.2
+    container_name: lab-node24
+    env_file: ./node-24.22.2/.env
+    ports:
+      - "0.0.0.0:3026:3000"
+    networks:
+      - lab-versions-net
+
+  mock-external:
+    build: ./mock-external
+    container_name: lab-mock-external
+    networks:
+      - lab-versions-net
+
+networks:
+  lab-versions-net:
+    driver: bridge

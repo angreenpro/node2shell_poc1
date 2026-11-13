@@ -1,0 +1,37 @@
+{
+  "Name": "Node2Shell_BROTLI_Block_Rule",
+  "Priority": 2,
+  "Statement": {
+    "RegexMatchStatement": {
+      "RegexString": "^\\s*br\\s*$",
+      "FieldToMatch": {
+        "SingleHeader": {
+          "Name": "content-encoding"
+        }
+      },
+      "TextTransformations": [
+        {
+          "Priority": 0,
+          "Type": "LOWERCASE"
+        }
+      ]
+    }
+  },
+  "Action": {
+    "Block": {
+      "CustomResponse": {
+        "ResponseCode": 415
+      }
+    }
+  },
+  "RuleLabels": [
+    {
+      "Name": "Node2Shell_Brotli_Mitigated"
+    }
+  ],
+  "VisibilityConfig": {
+    "SampledRequestsEnabled": true,
+    "CloudWatchMetricsEnabled": true,
+    "MetricName": "Node2Shell_BROTLI"
+  }
+}

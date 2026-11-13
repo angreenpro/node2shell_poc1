@@ -1,0 +1,61 @@
+# ==============================================================================
+# DOCKER COMPOSE - REMEDIATED & HARDENED ENVIRONMENT (CVE-2026-111497)
+# Cổng 8081: Hardened Nginx WAF | Cổng 3002: Patched & Hardened Node.js App
+# ==============================================================================
+services:
+  waf-hardened:
+    image: nginx:alpine
+    container_name: rem-waf-hardened
+    ports:
+      - "0.0.0.0:8081:80"
+    volumes:
+      - ./configs/nginx.conf.hardened:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app-patched
+    networks:
+      - remediation-net
+
+  app-patched:
+    build:
+      context: ./configs
+      dockerfile: patched_target.Dockerfile
+    container_name: rem-app-patched
+    ports:
+      - "0.0.0.0:3002:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - remediation-net
+
+  mock-external:
+    image: node:22-bookworm-slim
+    container_name: rem-mock-external
+    working_dir: /app
+    command: >
+      node -e "
+      require('http').createServer((req, res) => {
+        const enc = req.headers['accept-encoding'] || 'none';
+        const exposed = /\bbr\b/.test(enc);
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({
+          clientSentAcceptEncoding: enc,
+          exposedToMaliciousBrotliResponse: exposed,
+          recommendation: exposed ? 'VULNERABLE OUTBOUND' : 'SAFE OUTBOUND'
+        }));
+      }).listen(4000, () => console.log('Mock External listening on 4000'));
+      "
+    networks:
+      - remediation-net
+
+networks:
+  remediation-net:
+    driver: bridge

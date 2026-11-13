@@ -1,0 +1,8 @@
+services:
+  node-20.19.5:
+    build: .  
+    container_name: lab-node-20.19.5
+    env_file:
+      - .env
+    ports:
+      - "0.0.0.0:3020:3000"

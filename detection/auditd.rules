@@ -1,0 +1,13 @@
+# ==============================================================================
+# LINUX AUDITD RULES - CVE-2026-111497 (Node2Shell)
+# Dat file nay tai: /etc/audit/rules.d/node2shell.rules && augenrules --load
+# ==============================================================================
+
+# Theo doi moi loi goi he thong execve (64-bit) sinh ra shell tu he thong
+-a always,exit -F arch=b64 -S execve -F path=/bin/sh -k node2shell_rce_exec
+-a always,exit -F arch=b64 -S execve -F path=/bin/bash -k node2shell_rce_exec
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/dash -k node2shell_rce_exec
+
+# Theo doi truy cap doc cac file nhay cam (/etc/shadow, /proc/self/environ)
+-w /etc/shadow -p r -k node2shell_cred_access
+-w /var/run/docker.sock -p rw -k node2shell_container_escape

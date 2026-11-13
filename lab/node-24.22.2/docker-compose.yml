@@ -1,0 +1,8 @@
+services:
+  node-24.22.2:
+    build: .  
+    container_name: lab-node-24.22.2
+    env_file:
+      - .env
+    ports:
+      - "0.0.0.0:3026:3000"

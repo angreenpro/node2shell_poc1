@@ -1,0 +1,34 @@
+# ==============================================================================
+# FALCO eBPF DETECTION RULES - CVE-2026-111497 (Node2Shell)
+# Phat hien hanh vi hau khai thac khi tien trinh Node.js sinh ra Shell
+# ==============================================================================
+
+- list: node2shell_shell_binaries
+  items: [sh, bash, dash, ash, zsh, ksh, csh, tcsh]
+
+- list: node2shell_recon_tools
+  items: [curl, wget, nc, ncat, netcat, socat, python, python3, perl, ruby, whoami, id, uname]
+
+- rule: Node2Shell RCE Shell Spawned by Node Process
+  desc: Phat hien tien trinh node thuc thi syscall execve de mo trinh thong dich lenh (Dau hieu RCE tu CVE-2026-111497)
+  condition: >
+    spawned_process and
+    container and
+    proc.pname = "node" and
+    proc.name in (node2shell_shell_binaries)
+  output: >
+    [CRITICAL - NODE2SHELL RCE] Tien trinh Node.js da mo Shell (user=%user.name user_uid=%user.uid container_id=%container.id container_name=%container.name parent=%proc.pname cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [CVE-2026-111497, Node2Shell, RCE, T1059.004, container]
+
+- rule: Node2Shell Suspicious Network or Recon Tool Execution
+  desc: Phat hien tien trinh node goi truc tiep cong cu mang hoac trinh sat he thong
+  condition: >
+    spawned_process and
+    container and
+    proc.pname = "node" and
+    proc.name in (node2shell_recon_tools)
+  output: >
+    [HIGH - NODE2SHELL RECON] Tien trinh Node.js thuc thi cong cu nghi ngo (container_name=%container.name proc=%proc.name cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [CVE-2026-111497, Node2Shell, Execution, T1059]

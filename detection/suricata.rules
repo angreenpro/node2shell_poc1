@@ -1,0 +1,15 @@
+# ==============================================================================
+# SURICATA IDS DETECTION RULES - CVE-2026-111497 (Node2Shell)
+# ==============================================================================
+
+# Rule 1: Phat hien luu luong HTTP POST su dung Content-Encoding: br (Giam sat be mat tan cong)
+alert http any any -> $HOME_NET any (msg:"CVE-2026-111497 Inbound HTTP POST with Brotli Encoding"; flow:to_server,established; http.method; content:"POST"; http.header; content:"Content-Encoding|3a|"; nocase; content:"br"; within:20; classtype:web-application-activity; sid:202611101; rev:1;)
+
+# Rule 2: Phat hien chuoi byte Probe/Exploit dac trung cua Node2Shell (Prefix 8b 00 00 46 a4 hoac chuoi lap f5 a8 47 3d ea)
+alert http any any -> $HOME_NET any (msg:"CVE-2026-111497 Node2Shell Brotli Block-Switch Probe Detected"; flow:to_server,established; http.header; content:"Content-Encoding|3a|"; nocase; content:"br"; within:20; http.request_body; content:"|8b 00 00 46 a4|"; depth:32; classtype:attempted-admin; sid:202611102; rev:1;)
+
+# Rule 3: Phat hien luong Brotli lom/hong (1 byte 0xff) duoc gui de do quet vi sai (Differential Scanning)
+alert http any any -> $HOME_NET any (msg:"CVE-2026-111497 Malformed Single-Byte Brotli Probe (0xff)"; flow:to_server,established; http.header; content:"Content-Encoding|3a|"; nocase; content:"br"; within:20; http.request_body; content:"|ff|"; bsize:1; classtype:attempted-recon; sid:202611103; rev:1;)
+
+# Rule 4: Phat hien phoi nhiem chieu ra (Outbound HTTP Client gui Accept-Encoding: br toi may chu la)
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CVE-2026-111497 Outbound HTTP Client Advertising Brotli Support"; flow:to_server,established; http.header; content:"Accept-Encoding|3a|"; nocase; content:"br"; within:30; classtype:policy-violation; sid:202611104; rev:1;)

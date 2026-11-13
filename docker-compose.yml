@@ -1,0 +1,114 @@
+# ==============================================================================
+# MASTER DOCKER COMPOSE - CVE-2026-111497 (Node2Shell)
+# Tích hợp: Nginx WAF + 5 Isolated Node.js Versions (lab/) + Falco eBPF + Dozzle
+# ==============================================================================
+services:
+  # 1. Edge WAF / Reverse Proxy (Trỏ mặc định vào bản Node 22.23.3 Vuln)
+  waf:
+    image: nginx:alpine
+    container_name: lab-waf
+    ports:
+      - "0.0.0.0:8080:80"
+    volumes:
+      - ./detection/nginx_waf.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - node-22-23-3-vuln
+    networks:
+      - cyber-lab-net
+
+  # 2. Nhánh EOL Node 20.19.5 (Chưa vá - Brotli 1.0.9) - Cổng 3020
+  node-20-19-5-vuln:
+    build: ./lab/node-20.19.5-vuln
+    container_name: lab-node20-vuln
+    env_file: ./lab/node-20.19.5-vuln/.env
+    ports:
+      - "0.0.0.0:3020:3000"
+    networks:
+      - cyber-lab-net
+
+  # 3. Nhánh LTS Node 22.23.3 (Chưa vá - Brotli 1.1.0) - Cổng 3000 & 3022
+  node-22-23-3-vuln:
+    build: ./lab/node-22.23.3-vuln
+    container_name: lab-target-node
+    hostname: app-vulnerable
+    env_file: ./lab/node-22.23.3-vuln/.env
+    ports:
+      - "0.0.0.0:3000:3000"
+      - "0.0.0.0:3022:3000"
+    networks:
+      cyber-lab-net:
+        aliases:
+          - app-vulnerable
+          - target-app
+
+  # 4. Nhánh Current Node 24.22.0 (Chưa vá - Brotli 1.1.0) - Cổng 3024
+  node-24-22-0-vuln:
+    build: ./lab/node-24.22.0-vuln
+    container_name: lab-node24-vuln
+    env_file: ./lab/node-24.22.0-vuln/.env
+    ports:
+      - "0.0.0.0:3024:3000"
+    networks:
+      - cyber-lab-net
+
+  # 5. Nhánh LTS Node 22.23.4 ĐÃ VÁ (Patched Control - Brotli 1.1.1) - Cổng 3002 & 3025
+  node-22-23-4-patched:
+    build: ./lab/node-22.23.4-patched
+    container_name: lab-node22-patched
+    env_file: ./lab/node-22.23.4-patched/.env
+    ports:
+      - "0.0.0.0:3002:3000"
+      - "0.0.0.0:3025:3000"
+    networks:
+      - cyber-lab-net
+
+  # 6. Nhánh Current Node 24.22.2 ĐÃ VÁ (Patched Control - Brotli 1.2.1) - Cổng 3026
+  node-24-22-2-patched:
+    build: ./lab/node-24.22.2-patched
+    container_name: lab-node24-patched
+    env_file: ./lab/node-24.22.2-patched/.env
+    ports:
+      - "0.0.0.0:3026:3000"
+    networks:
+      - cyber-lab-net
+
+  # 7. Mock External Server (Kiểm tra Outbound Fetch / Axios Accept-Encoding: br)
+  mock-external:
+    build: ./lab/mock-external
+    container_name: lab-mock-external
+    networks:
+      cyber-lab-net:
+        aliases:
+          - mock-external
+          - external-server
+
+  # 8. Falco eBPF Runtime EDR (Bắt syscall execve khi node gọi /bin/sh)
+  falco:
+    image: falcosecurity/falco-no-driver:latest
+    container_name: lab-falco-edr
+    privileged: true
+    security_opt:
+      - label:disable
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+      - ./detection/falco_rules.yaml:/etc/falco/rules.d/node2shell_rules.yaml:ro
+    command: ["/usr/bin/falco", "-o", "engine.kind=modern_ebpf"]
+    networks:
+      - cyber-lab-net
+
+  # 9. Dozzle Web Log Viewer (Quan sát toàn bộ log trên trình duyệt tại cổng 9999)
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: lab-dozzle-ui
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "0.0.0.0:9999:8080"
+    networks:
+      - cyber-lab-net
+
+networks:
+  cyber-lab-net:
+    driver: bridge

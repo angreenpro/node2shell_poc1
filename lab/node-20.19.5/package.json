@@ -1,0 +1,9 @@
+{
+  "name": "node-20.19.5",
+  "version": "1.0.0",
+  "description": "Vulnerable (Branch 20.x) - Node v20.19.5 (libbrotli 1.0.9)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
