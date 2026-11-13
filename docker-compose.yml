@@ -30,7 +30,7 @@ services:
   node-22-23-3:
     build: ./lab/node-22.23.3
     container_name: lab-target-node
-    hostname: apperable
+    hostname: app-vulnerable
     env_file: ./lab/node-22.23.3/.env
     ports:
       - "0.0.0.0:3000:3000"
@@ -38,7 +38,7 @@ services:
     networks:
       cyber-lab-net:
         aliases:
-          - apperable
+          - app-vulnerable
           - target-app
 
   # 4. Nhánh Current Node 24.22.0 (Chưa vá - Brotli 1.1.0) - Cổng 3024

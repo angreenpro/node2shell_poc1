@@ -7,7 +7,7 @@ import urllib.error
 from typing import Tuple, Dict, Optional
 
 # Cau hinh dia chi muc tieu trong Lab (co the ghi de bang bien moi truong)
-WAF_URL = os.environ.get("LAB_WAF_URL", "http://localhost:8080")
+WAF_URL = os.environ.get("LAB_WAF_URL", "http://localhost:8085")
 DIRECT_APP_URL = os.environ.get("LAB_DIRECT_URL", "http://localhost:3000")
 FALCO_CONTAINER = os.environ.get("LAB_FALCO_CONTAINER", "lab-falco-edr")
 

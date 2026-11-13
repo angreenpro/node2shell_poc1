@@ -15,7 +15,7 @@ import time
 import urllib.request
 import urllib.error
 
-WAF_URL = os.environ.get("LAB_WAF_URL", "http://localhost:8080")
+WAF_URL = os.environ.get("LAB_WAF_URL", "http://localhost:8085")
 DIRECT_URL = os.environ.get("LAB_DIRECT_URL", "http://localhost:3000")
 WAF_CONTAINER = os.environ.get("LAB_WAF_CONTAINER", "lab-waf")
 TARGET_CONTAINER = os.environ.get("LAB_TARGET_CONTAINER", "lab-target-node")
