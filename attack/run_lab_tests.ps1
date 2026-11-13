@@ -8,6 +8,9 @@
     .\run_lab_tests.ps1 -Action all
     .\run_lab_tests.ps1 -Action 1
 #>
+# --- Ép mã hóa chuẩn UTF-8 để không bị lỗi font tiếng Việt ---
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 param(
     [string]$Action = "menu",
