@@ -1,0 +1,157 @@
+const http = require('http');
+const zlib = require('zlib');
+
+const PORT = process.env.PORT || 3000;
+const PROFILE_NAME = process.env.PROFILE_NAME || 'node-22.23.4-hardened';
+const SIM_NODE_VER = process.env.SIM_NODE_VER || 'v22.23.4';
+const SIM_BROTLI_VER = process.env.SIM_BROTLI_VER || '1.1.1';
+const MOCK_EXT_URL = process.env.MOCK_EXT_URL || 'http://mock-external:4000/check';
+
+const DISABLE_INBOUND_BROTLI = process.env.DISABLE_INBOUND_BROTLI === 'true';
+const ENFORCE_SAFE_OUTBOUND = process.env.ENFORCE_SAFE_OUTBOUND !== 'false';
+const MAX_DECOMPRESS_BYTES = 1024 * 1024; // Gioi han 1MB chong tran bo nho / DoS
+
+function isBrotliPatched(verStr) {
+  const parts = String(verStr).split('.').map(x => parseInt(x, 10) || 0);
+  const [maj, min, pat] = [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+  if (maj > 1) return true;
+  if (maj === 1 && min === 2 && pat >= 1) return true;
+  if (maj === 1 && min === 1 && pat >= 1) return true;
+  if (maj === 1 && min === 0 && pat >= 10) return true;
+  return false;
+}
+
+const server = http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // 1. Endpoint kiem tra phien ban Runtime & trang thai Hardening
+  if (req.url === '/api/info' && req.method === 'GET') {
+    const patched = isBrotliPatched(SIM_BROTLI_VER);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      profile: PROFILE_NAME,
+      nodeVersion: SIM_NODE_VER,
+      brotliVersion: SIM_BROTLI_VER,
+      zlibVersion: process.versions.zlib,
+      runningAsUid: process.getuid ? process.getuid() : 1000,
+      hardeningControls: {
+        runtimePatched: patched,
+        outboundBrotliStripped: ENFORCE_SAFE_OUTBOUND,
+        inboundBrotliDisabledInCode: DISABLE_INBOUND_BROTLI,
+        maxDecompressBytes: MAX_DECOMPRESS_BYTES
+      },
+      status: patched ? 'PATCHED' : 'VULNERABLE'
+    }, null, 2));
+  }
+
+  // 2. Endpoint nhan du lieu nen chieu vao (Co kiem tra kich thuoc & chan Block Switch loi)
+  if (req.url === '/api/upload' && req.method === 'POST') {
+    const encoding = (req.headers['content-encoding'] || '').toLowerCase();
+    const patched = isBrotliPatched(SIM_BROTLI_VER);
+
+    if (DISABLE_INBOUND_BROTLI && encoding.includes('br')) {
+      res.writeHead(415, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Brotli disabled by application policy' }));
+    }
+
+    if (!encoding.includes('br')) {
+      if (encoding && encoding !== 'identity') {
+        res.writeHead(415, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Unsupported Content-Encoding', encoding }));
+      }
+      let raw = [];
+      req.on('data', chunk => raw.push(chunk));
+      req.on('end', () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ profile: PROFILE_NAME, mode: 'plain', bytes: Buffer.concat(raw).length }));
+      });
+      return;
+    }
+
+    let rawChunks = [];
+    let totalBytes = 0;
+    req.on('data', c => {
+      totalBytes += c.length;
+      if (totalBytes > MAX_DECOMPRESS_BYTES) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Payload Too Large' }));
+        req.destroy();
+        return;
+      }
+      rawChunks.push(c);
+    });
+
+    req.on('end', () => {
+      const fullBuf = Buffer.concat(rawChunks);
+
+      // Tren ban DA VA (Brotli >= 1.1.1 / 1.2.1), chan ngay chuoi CVE Block-Switch Probe (8b000046a4)
+      if (fullBuf.length >= 5 && fullBuf.subarray(0, 5).equals(Buffer.from('8b000046a4', 'hex'))) {
+        if (patched) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({
+            profile: PROFILE_NAME,
+            brotliVersion: SIM_BROTLI_VER,
+            error: 'Decompression failed: Blocked by Patched Brotli State Validation',
+            code: 'ERR_BROTLI_INVALID_BLOCK_SWITCH'
+          }));
+        }
+      }
+
+      zlib.brotliDecompress(fullBuf, { maxOutputLength: MAX_DECOMPRESS_BYTES }, (err, decompressed) => {
+        if (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({
+            profile: PROFILE_NAME,
+            brotliVersion: SIM_BROTLI_VER,
+            error: 'Decompression failed safely',
+            code: err.code || 'Z_DATA_ERROR'
+          }));
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          profile: PROFILE_NAME,
+          brotliVersion: SIM_BROTLI_VER,
+          message: 'Decompressed safely',
+          outputLength: decompressed.length
+        }));
+      });
+    });
+    return;
+  }
+
+  // 3. Endpoint Outbound HTTP Client (Mac dinh ep cung Accept-Encoding: gzip, deflate)
+  if (req.url === '/api/webhook-test' && req.method === 'GET') {
+    const safeOutbound = ENFORCE_SAFE_OUTBOUND || req.headers['x-safe-outbound'] === 'true';
+    const customHeaders = safeOutbound ? { 'Accept-Encoding': 'gzip, deflate' } : {};
+    try {
+      const response = await fetch(MOCK_EXT_URL, { headers: customHeaders });
+      const data = await response.json();
+      data.profile = PROFILE_NAME;
+      data.nodeVersion = SIM_NODE_VER;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(data, null, 2));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({
+        clientSentAcceptEncoding: safeOutbound ? 'gzip, deflate' : 'br, gzip, deflate',
+        exposedToMaliciousBrotliResponse: !safeOutbound
+      }, null, 2));
+    }
+  }
+
+  // 4. Khoa hoan toan Endpoint gia lap RCE tren ban Hardened
+  if (req.url === '/sim/rce-trigger') {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      status: 403,
+      message: 'RCE simulation endpoint is disabled and privileges are dropped in remediated build'
+    }));
+  }
+
+  res.writeHead(404);
+  res.end('Not Found');
+});
+
+server.listen(PORT, () => {
+  console.log(`[HARDENED] ${PROFILE_NAME} (${SIM_NODE_VER} | Brotli ${SIM_BROTLI_VER}) listening on ${PORT}`);
+});

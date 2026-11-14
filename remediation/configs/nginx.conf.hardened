@@ -1,0 +1,30 @@
+log_format hardened_sec_log '$remote_addr - [$time_local] "$request" '
+                            'status=$status content_encoding="$http_content_encoding" '
+                            'body_bytes=$request_length ua="$http_user_agent"';
+
+server {
+    listen 80;
+    server_name _;
+
+    access_log /var/log/nginx/access.log hardened_sec_log;
+    server_tokens off;
+
+    # 1. Gioi han kich thuoc body toi da 1MB (Chan luong Probe ~23MB)
+    client_max_body_size 1m;
+    client_body_timeout 10s;
+
+    # 2. Virtual Patching: Chan tat ca HTTP Request co Content-Encoding chua 'br'
+    if ($http_content_encoding ~* "\bbr\b") {
+        return 415 '{"status": 415, "error": "Unsupported Media Type", "remediation": "Inbound Brotli encoding is disabled by WAF policy (CVE-2026-111497)"}\n';
+    }
+
+    location / {
+        proxy_pass http://app-patched:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # 3. Chuan hoa Header: Chi cho phep gzip/deflate di vao Backend
+        proxy_set_header Accept-Encoding "gzip, deflate";
+    }
+}
