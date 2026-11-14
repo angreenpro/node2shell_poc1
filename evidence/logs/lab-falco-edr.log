@@ -1,0 +1,19 @@
+2026-11-13T22:03:47+0000: Falco version: 0.39.2 (x86_64)
+2026-11-13T22:03:47+0000: Falco initialized with configuration files:
+2026-11-13T22:03:47+0000:    /etc/falco/falco.yaml | schema validation: ok
+2026-11-13T22:03:47+0000: System info: Linux version 7.2.11-200.fc44.x86_64 (mockbuild@cb5cc89400844e5d9ea7b0269148d146) (gcc (GCC) 16.2.1 20260819 (Red Hat 16.2.1-2), GNU ld version 2.46.1-1.fc44) #1 SMP PREEMPT_DYNAMIC Thu Oct 15 15:58:58 UTC 2026
+2026-11-13T22:03:47+0000: Loading rules from:
+2026-11-13T22:03:47+0000:    /etc/falco/falco_rules.yaml | schema validation: ok
+2026-11-13T22:03:47+0000:    /etc/falco/falco_rules.local.yaml | schema validation: none
+2026-11-13T22:03:47+0000:    /etc/falco/rules.d/node2shell_rules.yaml | schema validation: ok
+2026-11-13T22:03:47+0000: The chosen syscall buffer dimension is: 8388608 bytes (8 MBs)
+2026-11-13T22:03:47+0000: Starting health webserver with threadiness 12, listening on 0.0.0.0:8765
+2026-11-13T22:03:47+0000: Loaded event sources: syscall
+2026-11-13T22:03:47+0000: Enabled event sources: syscall
+2026-11-13T22:03:47+0000: Opening 'syscall' source with modern BPF probe.
+2026-11-13T22:03:47+0000: One ring buffer every '2' CPUs.
+2026-11-13T22:03:48+0000: An error occurred in an event source, forcing termination...
+Error: Initialization issues during scap_init
+Events detected: 0
+Rule counts by severity:
+Triggered rules by rule name:

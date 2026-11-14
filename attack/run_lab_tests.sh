@@ -5,7 +5,7 @@
 # ==============================================================================
 set -u
 
-WAF_URL="${LAB_WAF_URL:-http://localhost:8080}"
+WAF_URL="${LAB_WAF_URL:-http://localhost:8085}"
 DIRECT_URL="${LAB_DIRECT_URL:-http://localhost:3000}"
 FALCO_CONTAINER="${LAB_FALCO_CONTAINER:-lab-falco-edr}"
 
@@ -86,7 +86,7 @@ test_05_edr_falco() {
 
 run_python_suite() {
     banner "CHAY BO PYTHON TEST SUITE (run_all_tests.py)"
-    python3 run_all_tests.py "$@"
+    python3 attack/run_all_tests.py "$@"
 }
 
 run_all_curl() {

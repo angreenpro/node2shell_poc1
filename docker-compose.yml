@@ -87,13 +87,31 @@ services:
     image: falcosecurity/falco-no-driver:latest
     container_name: lab-falco-edr
     privileged: true
+    pid: host
+    ipc: host
     security_opt:
       - label:disable
+      - apparmor:unconfined
+    environment: 
+      - FALCO_BPF_PROBE=""
+    cap_add:
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - SYS_RESOURCE
+      - BPF
+      - PERFMON
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - /var/run/docker.sock:/host/var/run/docker.sock
       - /proc:/host/proc:ro
       - /etc:/host/etc:ro
+      - /sys:/host/sys:ro
       - ./detection/falco_rules.yaml:/etc/falco/rules.d/node2shell_rules.yaml:ro
+      - /sys/kernel/debug:/sys/kernel/debug:ro
+      - /sys/fs/bpf:/sys/fs/bpf
     command: [ "/usr/bin/falco", "-o", "engine.kind=modern_ebpf" ]
     networks:
       - cyber-lab-net

@@ -7,10 +7,10 @@ if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" = "Enforcing" ]; t
 fi
 docker compose up -d --build
 echo "[+] Lab da san sang!"
-echo "    - Nginx WAF        : http://localhost:8080"
-echo "    - Node 20.19.5 Vuln: http://localhost:3020"
-echo "    - Node 22.23.3 Vuln: http://localhost:3000 (hoac :3022)"
-echo "    - Node 24.22.0 Vuln: http://localhost:3024"
-echo "    - Node 22.23.4 Safe: http://localhost:3002 (hoac :3025)"
-echo "    - Node 24.22.2 Safe: http://localhost:3026"
+echo "    - Nginx WAF        : http://localhost:8085"
+echo "    - Node 20.19.5 : http://localhost:3020"
+echo "    - Node 22.23.3 : http://localhost:3000 (hoac :3022)"
+echo "    - Node 24.22.0 : http://localhost:3024"
+echo "    - Node 22.23.4 : http://localhost:3002 (hoac :3025)"
+echo "    - Node 24.22.2 : http://localhost:3026"
 echo "    - Dozzle Web Log UI: http://localhost:9999"

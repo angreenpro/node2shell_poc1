@@ -1,5 +1,6 @@
 const http = require('http');
 const zlib = require('zlib');
+const { exec } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 const PROFILE_NAME = process.env.PROFILE_NAME || 'node-22.23.3';
@@ -26,9 +27,6 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       profile: PROFILE_NAME,
-      role: 'Vulnerable (Branch 22.x LTS)',
-      actualNodeBinary: process.version,
-      actualBrotliBinary: process.versions.brotli,
       nodeVersion: SIM_NODE_VER,
       brotliVersion: SIM_BROTLI_VER,
       zlibVersion: process.versions.zlib,
@@ -36,7 +34,7 @@ const server = http.createServer(async (req, res) => {
     }, null, 2));
   }
 
-  // 2. Endpoint kiem thu giai nen Brotli Chieu vao (Inbound Stream Error Handling)
+  // 2. Endpoint kiem thu giai nen Brotli Chieu vao
   if (req.url === '/api/upload' && req.method === 'POST') {
     const encoding = (req.headers['content-encoding'] || '').toLowerCase();
     const patched = isBrotliPatched(SIM_BROTLI_VER);
@@ -59,45 +57,19 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => rawChunks.push(c));
     req.on('end', () => {
       const fullBuf = Buffer.concat(rawChunks);
-
-      // Kiem tra tin hieu mo phong trang thai giua ban Loi va ban Va
       if (fullBuf.length >= 5 && fullBuf.subarray(0, 5).equals(Buffer.from('8b000046a4', 'hex'))) {
-        if (!patched) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({
-            profile: PROFILE_NAME,
-            brotliVersion: SIM_BROTLI_VER,
-            message: 'Simulated unpatched state behavior',
-            probeAccepted: true
-          }));
-        } else {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({
-            profile: PROFILE_NAME,
-            brotliVersion: SIM_BROTLI_VER,
-            error: 'Blocked by patched state validation',
-            code: 'ERR_BROTLI_INVALID_BLOCK_SWITCH'
-          }));
-        }
+        const code = patched ? 400 : 200;
+        res.writeHead(code, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ profile: PROFILE_NAME, probeAccepted: !patched }));
       }
 
       zlib.brotliDecompress(fullBuf, (err, decompressed) => {
         if (err) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({
-            profile: PROFILE_NAME,
-            brotliVersion: SIM_BROTLI_VER,
-            error: 'Decompression failed safely',
-            code: err.code || 'Z_DATA_ERROR'
-          }));
+          return res.end(JSON.stringify({ error: 'Decompression failed safely', code: err.code || 'Z_DATA_ERROR' }));
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          profile: PROFILE_NAME,
-          brotliVersion: SIM_BROTLI_VER,
-          message: 'Decompressed successfully',
-          outputLength: decompressed.length
-        }));
+        res.end(JSON.stringify({ message: 'Decompressed successfully', outputLength: decompressed.length }));
       });
     });
     return;
@@ -110,14 +82,24 @@ const server = http.createServer(async (req, res) => {
       const customHeaders = safeMode ? { 'Accept-Encoding': 'gzip, deflate' } : {};
       const response = await fetch(MOCK_EXT_URL, { headers: customHeaders });
       const data = await response.json();
-      data.profile = PROFILE_NAME;
-      data.nodeVersion = SIM_NODE_VER;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(data, null, 2));
     } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: e.message }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({
+        clientSentAcceptEncoding: safeMode ? 'gzip, deflate' : 'br, gzip, deflate',
+        exposedToMaliciousBrotliResponse: !safeMode
+      }));
     }
+  }
+
+  // 4. Endpoint kich hoat gia lap RCE Telemetry (Test 05)
+  if (req.url === '/sim/rce-trigger' && req.method === 'POST') {
+    exec('/bin/sh -c "id && uname -r"', (err, stdout, stderr) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(`[Simulated RCE Executed]\n` + (stdout || stderr));
+    });
+    return;
   }
 
   res.writeHead(404);
@@ -125,5 +107,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[${PROFILE_NAME}] Node ${SIM_NODE_VER} (Brotli ${SIM_BROTLI_VER}) listening on port ${PORT}`);
+  console.log(`[${PROFILE_NAME}] Listening on port ${PORT}`);
 });

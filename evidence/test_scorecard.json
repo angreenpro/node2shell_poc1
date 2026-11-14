@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-11-13T22:19:14Z",
+  "cve": "CVE-2026-111497",
+  "environment": "Fedora Linux / Kali VM / Docker Host",
+  "waf_url": "http://localhost:8085",
+  "direct_url": "http://localhost:3000",
+  "tests": [
+    {
+      "id": "01",
+      "name": "Runtime & Brotli Version Audit",
+      "passed": true,
+      "nodeVersion": "v22.23.3",
+      "brotliVersion": "1.1.0"
+    },
+    {
+      "id": "02",
+      "name": "Differential Probing & WAF Isolation",
+      "passed": true,
+      "waf_0x3b": 415,
+      "waf_0xff": 415,
+      "direct_0x3b": 200,
+      "direct_0xff": 400
+    },
+    {
+      "id": "03",
+      "name": "WAF Content-Encoding Block & DoS Resilience",
+      "passed": true,
+      "waf_blocked_415": 415,
+      "direct_status": 400,
+      "alive_status": 200
+    },
+    {
+      "id": "04",
+      "name": "Outbound Client Header Leakage (SSRF)",
+      "passed": false,
+      "default_accept_encoding": "gzip, deflate",
+      "default_exposed": false,
+      "safe_accept_encoding": "gzip, deflate",
+      "safe_exposed": false
+    },
+    {
+      "id": "05",
+      "name": "Post-Exploitation RCE Telemetry",
+      "passed": true,
+      "output": "[Simulated RCE Executed] uid=0(root) gid=0(root) groups=0(root) 7.2.11-200.fc44.x86_64 "
+    }
+  ],
+  "matrix": [
+    {
+      "profile": "Node 20.19.5 (EOL Vuln)",
+      "port": 3020,
+      "nodeVersion": "v20.19.5",
+      "brotliVersion": "1.0.9",
+      "probeStatus": 200,
+      "verdict": "VULNERABLE"
+    },
+    {
+      "profile": "Node 22.23.3 (LTS Vuln)",
+      "port": 3022,
+      "nodeVersion": "v22.23.3",
+      "brotliVersion": "1.1.0",
+      "probeStatus": 200,
+      "verdict": "VULNERABLE"
+    },
+    {
+      "profile": "Node 24.22.0 (Current Vuln)",
+      "port": 3024,
+      "nodeVersion": "v24.22.0",
+      "brotliVersion": "1.1.0",
+      "probeStatus": 200,
+      "verdict": "VULNERABLE"
+    },
+    {
+      "profile": "Node 22.23.4 (Patched)",
+      "port": 3025,
+      "nodeVersion": "v22.23.4",
+      "brotliVersion": "1.1.1",
+      "probeStatus": 400,
+      "verdict": "PATCHED (SAFE)"
+    },
+    {
+      "profile": "Node 24.22.2 (Patched)",
+      "port": 3026,
+      "nodeVersion": "v24.22.2",
+      "brotliVersion": "1.2.1",
+      "probeStatus": 400,
+      "verdict": "PATCHED (SAFE)"
+    }
+  ]
+}
